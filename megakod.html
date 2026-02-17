@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Studio - Professional v2.6</title>
+    <style>
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100px) translateX(-50%); opacity: 0; }
+            to { transform: translateY(0) translateX(-50%); opacity: 1; }
+        }
+
+        body {
+            margin: 0; padding: 20px; min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(-45deg, #1a1a2e, #16213e, #0f3460, #533483);
+            background-size: 400% 400%;
+            animation: gradientBG 12s ease infinite;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px; padding: 30px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+            width: 100%; max-width: 900px; margin-bottom: 30px;
+        }
+
+        h2 { text-align: center; text-transform: uppercase; letter-spacing: 3px; font-weight: 300; margin: 0 0 15px 0; }
+        .badge { background: #0fecad; color: #1a1a2e; padding: 3px 12px; border-radius: 50px; font-size: 12px; position: relative; top: -10px; font-weight: bold; }
+
+        .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .control-group { display: flex; flex-direction: column; gap: 8px; }
+        label { font-size: 11px; opacity: 0.8; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+
+        select, input[type="text"], input[type="color"] { 
+            padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); 
+            background: rgba(0,0,0,0.4); color: white; outline: none; width: 100%; box-sizing: border-box;
+        }
+        input[type="color"] { height: 40px; cursor: pointer; padding: 2px; }
+
+        #text-style-group { display: none; }
+
+        .checkbox-group { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; margin-top: 5px; }
+        .checkbox-group input { width: 18px; height: 18px; cursor: pointer; }
+
+        .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        .btn { padding: 12px 24px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; text-transform: uppercase; font-size: 12px; }
+        .btn-file { background: #fff; color: #1a1a2e; }
+        .btn-live { background: #e94560; color: #fff; }
+        .btn-draw { background: #fca311; color: #fff; }
+        .btn-copy { background: #0fecad; color: #1a1a2e; }
+        .btn:hover { transform: translateY(-3px); filter: brightness(1.1); }
+
+        #ascii-result {
+            font-family: 'Courier New', monospace; 
+            background: #000; 
+            padding: 20px; border-radius: 15px; 
+            white-space: pre; line-height: 1;
+            overflow: auto; max-width: 95vw; 
+            border: 1px solid #333;
+            min-height: 50px;
+        }
+
+        #toast {
+            position: fixed; bottom: 30px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 236, 173, 0.9);
+            backdrop-filter: blur(15px);
+            color: #1a1a2e; padding: 15px 30px;
+            border-radius: 50px; font-weight: bold;
+            display: none; z-index: 2000;
+            animation: slideUp 0.4s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            white-space: nowrap;
+        }
+
+        #editor-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); display: none;
+            flex-direction: column; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .editor-container { background: #222; padding: 20px; border-radius: 15px; text-align: center; width: 90%; max-width: 700px; }
+        #paint-canvas { background: white; cursor: crosshair; border-radius: 5px; touch-action: none; width: 100%; height: auto; max-height: 60vh; }
+        
+        video, #hidden-canvas, #text-canvas { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="glass-panel">
+        <h2>ASCII Visualizer <span class="badge">PRO v2.6</span></h2>
+        
+        <div class="settings-grid">
+            <div class="control-group" style="grid-column: span 2;">
+                <label>Сгенерировать текст:</label>
+                <input type="text" id="text-input" placeholder="Введите слово...">
+            </div>
+
+            <div class="control-group" id="text-style-group">
+                <label>Стиль текста:</label>
+                <select id="font-family-select">
+                    <option value="Arial Black">Жирный</option>
+                    <option value="Georgia">С засечками</option>
+                    <option value="Courier New">Печатный</option>
+                    <option value="Impact">Узкий/Плотный</option>
+                    <option value="Brush Script MT">Рукописный</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Детализация: <span id="w-val">100</span></label>
+                <input type="range" id="width-range" min="30" max="250" value="100">
+            </div>
+            
+            <div class="control-group">
+                <label>Цвет символов:</label>
+                <input type="color" id="char-color" value="#00ff41">
+                <label class="checkbox-group">
+                    <input type="checkbox" id="auto-color" checked> Цвета фото
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>Стиль ASCII:</label>
+                <select id="preset-select">
+                    <option value='$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,"^`\'. '>Стандарт</option>
+                    <option value="█▓▒░ ">Блоки</option>
+                    <option value="01">Матрица</option>
+                    <option value="custom">Свой набор...</option>
+                </select>
+                <input type="text" id="custom-input" placeholder="Символы..." style="display:none; margin-top:5px;">
+            </div>
+
+            <div class="control-group">
+                <label>Фон / Шрифт:</label>
+                <select id="bg-select">
+                    <option value="#000000">Черный фон</option>
+                    <option value="#ffffff">Белый фон</option>
+                </select>
+                <input type="range" id="font-range" min="1" max="15" value="7">
+            </div>
+        </div>
+
+        <div class="actions">
+            <label class="btn btn-file"><input type="file" id="upload" accept="image/*" style="display:none;">📂 Фото</label>
+            <button class="btn btn-draw" id="open-editor">🎨 Рисовать</button>
+            <button class="btn btn-live" id="live-btn">🎬 Live</button>
+            <button class="btn btn-copy" id="copy-btn">📋 Копия</button>
+        </div>
+    </div>
+
+    <pre id="ascii-result"></pre>
+
+    <div id="toast">Вы успешно скопировали ваш ASCII арт!</div>
+
+    <canvas id="text-canvas"></canvas>
+    <canvas id="hidden-canvas"></canvas>
+    <video id="video" autoplay playsinline></video>
+
+    <div id="editor-overlay">
+        <div class="editor-container">
+            <h3>Editor</h3>
+            <canvas id="paint-canvas" width="800" height="600"></canvas>
+            <div class="editor-btns" style="margin-top:15px; display:flex; gap:10px; justify-content:center;">
+                <button class="btn btn-file" onclick="setPaintColor('black')">Кисть</button>
+                <button class="btn btn-file" onclick="setPaintColor('white')">Ластик</button>
+                <button class="btn btn-file" onclick="clearCanvas()">Очистить</button>
+                <button class="btn btn-copy" id="apply-draw">ГОТОВО</button>
+                <button class="btn btn-live" id="close-editor">ОТМЕНА</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const result = document.getElementById('ascii-result');
+        const hiddenCanvas = document.getElementById('hidden-canvas');
+        const hCtx = hiddenCanvas.getContext('2d', { willReadFrequently: true });
+        const textCanvas = document.getElementById('text-canvas');
+        const tCtx = textCanvas.getContext('2d');
+        const toast = document.getElementById('toast');
+        
+        const textInput = document.getElementById('text-input');
+        const textStyleGroup = document.getElementById('text-style-group');
+        const fontFamilySelect = document.getElementById('font-family-select');
+        const widthRange = document.getElementById('width-range');
+        const fontRange = document.getElementById('font-range');
+        const presetSelect = document.getElementById('preset-select');
+        const customInput = document.getElementById('custom-input');
+        const bgSelect = document.getElementById('bg-select');
+        const charColorInput = document.getElementById('char-color');
+        const autoColorCheck = document.getElementById('auto-color');
+
+        let currentImg = null;
+        let isLive = false;
+
+        function showToast() {
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 2500);
+        }
+
+        function generateTextToImage() {
+            const text = textInput.value;
+            if (!text) { textStyleGroup.style.display = 'none'; return; }
+            textStyleGroup.style.display = 'block';
+            autoColorCheck.checked = false;
+            textCanvas.width = 1000; textCanvas.height = 200;
+            tCtx.fillStyle = "white"; tCtx.fillRect(0, 0, textCanvas.width, textCanvas.height);
+            tCtx.fillStyle = "black";
+            tCtx.font = `bold 120px ${fontFamilySelect.value}`;
+            tCtx.textAlign = "center"; tCtx.textBaseline = "middle";
+            tCtx.fillText(text, 500, 100);
+            currentImg = textCanvas;
+            render();
+        }
+
+        function render(source = currentImg) {
+            if (!source) return;
+            const w = parseInt(widthRange.value);
+            let aspect = (source instanceof HTMLVideoElement) ? source.videoHeight / source.videoWidth : (source.height / source.width);
+            const h = Math.round(w * aspect * 0.55);
+            hiddenCanvas.width = w; hiddenCanvas.height = h;
+            hCtx.clearRect(0,0,w,h);
+            if (isLive) { hCtx.translate(w, 0); hCtx.scale(-1, 1); }
+            hCtx.drawImage(source, 0, 0, w, h);
+            const pixels = hCtx.getImageData(0, 0, w, h).data;
+            const chars = (presetSelect.value === 'custom') ? customInput.value : presetSelect.value;
+            const isAuto = autoColorCheck.checked;
+            const staticColor = charColorInput.value;
+            let artHTML = "";
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const i = (y * w + x) * 4;
+                    const brightness = (0.2126 * pixels[i] + 0.7152 * pixels[i+1] + 0.0722 * pixels[i+2]);
+                    const charIdx = Math.floor((brightness / 255) * (chars.length - 1));
+                    const char = chars[charIdx] || ' ';
+                    if (isAuto) artHTML += `<span style="color:rgb(${pixels[i]},${pixels[i+1]},${pixels[i+2]})">${char}</span>`;
+                    else artHTML += char;
+                }
+                artHTML += "\n";
+            }
+            if (isAuto) result.innerHTML = artHTML;
+            else { result.style.color = staticColor; result.textContent = artHTML; }
+        }
+
+        textInput.oninput = generateTextToImage;
+        fontFamilySelect.onchange = generateTextToImage;
+
+        function syncUI() {
+            document.getElementById('w-val').textContent = widthRange.value;
+            result.style.fontSize = fontRange.value + 'px';
+            result.style.background = bgSelect.value;
+            customInput.style.display = (presetSelect.value === 'custom') ? 'block' : 'none';
+            if (!isLive) render();
+        }
+
+        [widthRange, fontRange, presetSelect, customInput, bgSelect, charColorInput, autoColorCheck].forEach(el => el.oninput = syncUI);
+
+        const video = document.getElementById('video');
+        const liveBtn = document.getElementById('live-btn');
+        async function toggleLive() {
+            if (isLive) {
+                isLive = false; liveBtn.innerText = "🎬 Live";
+                video.srcObject.getTracks().forEach(t => t.stop());
+            } else {
+                try {
+                    const s = await navigator.mediaDevices.getUserMedia({ video: true });
+                    video.srcObject = s; isLive = true; liveBtn.innerText = "⏹ Стоп";
+                    const tick = () => { if(isLive) { render(video); requestAnimationFrame(tick); } };
+                    tick();
+                } catch(e) { alert("Камера недоступна"); }
+            }
+        }
+        liveBtn.onclick = toggleLive;
+
+        document.getElementById('upload').onchange = (e) => {
+            textInput.value = "";
+            const r = new FileReader();
+            r.onload = (ev) => { currentImg = new Image(); currentImg.onload = render; currentImg.src = ev.target.result; };
+            r.readAsDataURL(e.target.files[0]);
+        };
+
+        const paintCanvas = document.getElementById('paint-canvas');
+        const pCtx = paintCanvas.getContext('2d');
+        let painting = false;
+        pCtx.fillStyle = "white"; pCtx.fillRect(0,0,800,600);
+        function setPaintColor(c) { pCtx.strokeStyle = c; pCtx.lineWidth = (c==='white'?30:8); pCtx.lineCap = 'round'; }
+        function clearCanvas() { pCtx.fillStyle = "white"; pCtx.fillRect(0,0,800,600); }
+        paintCanvas.onmousedown = () => { painting = true; pCtx.beginPath(); };
+        paintCanvas.onmousemove = (e) => { 
+            if(!painting) return; 
+            const r = paintCanvas.getBoundingClientRect();
+            pCtx.lineTo((e.clientX - r.left)*(800/r.width), (e.clientY - r.top)*(600/r.height)); pCtx.stroke(); 
+        };
+        window.onmouseup = () => painting = false;
+        document.getElementById('open-editor').onclick = () => document.getElementById('editor-overlay').style.display='flex';
+        document.getElementById('close-editor').onclick = () => document.getElementById('editor-overlay').style.display='none';
+        document.getElementById('apply-draw').onclick = () => {
+            currentImg = paintCanvas; render(); document.getElementById('editor-overlay').style.display='none';
+        };
+
+        // ИСПРАВЛЕННАЯ ФУНКЦИЯ КОПИРОВАНИЯ
+        document.getElementById('copy-btn').onclick = function() {
+            // Используем textContent, чтобы игнорировать HTML-теги <span> и забирать только чистые символы
+            const textToCopy = result.textContent;
+            
+            if (!textToCopy || textToCopy.trim() === "") return;
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showToast();
+                // Небольшой эффект на кнопке
+                const originalText = this.innerText;
+                this.innerText = "✅ ГОТОВО";
+                this.style.background = "#fff";
+                setTimeout(() => {
+                    this.innerText = originalText;
+                    this.style.background = "";
+                }, 1500);
+            }).catch(err => {
+                console.error('Ошибка копирования: ', err);
+            });
+        };
+
+        syncUI();
+    </script>
+</body>
+</html>
